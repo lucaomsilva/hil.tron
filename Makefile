@@ -19,11 +19,11 @@ FS_FILE     = $(BUILD_DIR)/$(PROJ).fs
 
 # Verilog/VHDL/SystemVerilog source files
 ifeq ($(HDL),VHDL)
-SRCS        = $(wildcard $(SRC_DIR)/*.vhd)
+SRCS        = $(shell find $(SRC_DIR) -name '*.vhd')
 else ifeq ($(HDL),SystemVerilog)
-SRCS        = $(wildcard $(SRC_DIR)/*.sv)
+SRCS        = $(shell find $(SRC_DIR) -name '*.sv')
 else
-SRCS        = $(wildcard $(SRC_DIR)/*.v)
+SRCS        = $(shell find $(SRC_DIR) -name '*.v')
 endif
 
 # === Board Configuration (Tang Nano 9K) ===
