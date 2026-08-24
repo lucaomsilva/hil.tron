@@ -66,7 +66,7 @@ lint: ## Run static analysis (linting) on source files
 ifeq ($(HDL),VHDL)
 	ghdl -s $(SRCS) || (echo -e "$(RED)Error: VHDL linting failed$(NC)"; exit 1)
 else
-	verible-verilog-lint $(SRCS) || (echo -e "$(RED)Error: Verilog/SV linting failed$(NC)"; exit 1)
+	verible-verilog-lint --rules_config=.rules.verible_lint $(SRCS) || (echo -e "$(RED)Error: Verilog/SV linting failed$(NC)"; exit 1)
 endif
 	@echo -e "$(GREEN)>> Linting complete.$(NC)"
 
