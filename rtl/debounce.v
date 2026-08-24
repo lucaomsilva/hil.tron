@@ -1,26 +1,34 @@
-// src/debounce.v
-module debounce(
-    input  wire clk,
-    input  wire btn_in,
-    output reg  btn_out
+module debounce
+#(
+    // Clock = 27MHz, 270000 cycles/period = 10 milliseconds.
+    parameter integer THRESHOLD = 270000
+)
+(
+    input clk,
+    input pb_in,
+    output reg pb_out
 );
-    // Contagem para ~1ms de debounce com clock de 27MHz
-    parameter integer STABILITY_COUNT = 20000;
-    reg [15:0] counter = 0;
-    reg internal_state = 1'b1;
-    always @(posedge clk) begin
-        if (btn_in!= internal_state) begin
-            // O sinal do botão mudou, reinicia o contador
-            counter <= 0;
 
-            internal_state <= btn_in;
-        end else if (counter < STABILITY_COUNT) begin
-            // O sinal está estável, mas o tempo de debounce não foi atingido
-            counter <= counter + 1;
-        end else begin
-            // O sinal está estável pelo tempo necessário, atualiza a saída
-            btn_out <= internal_state;
-        end
+  reg sync_0, sync_1;
+
+  always @(posedge clk) begin
+      sync_0 <= pb_in;
+      sync_1 <= sync_0;
+  end
+
+  reg [19:0] counter = 20'd0;
+
+  always @(posedge clk) begin
+    if (sync_1 != pb_out) begin
+      counter <= counter + 1'b1;
+
+      if (counter == THRESHOLD) begin
+          pb_out <= sync_1;
+          counter <= 20'b0;
+      end
+    end else begin
+      counter <= 20'd0;
     end
+  end
 
 endmodule

@@ -1,30 +1,37 @@
 module top
 (
-    input clk,
-    input btn_in,
-    output [5:0] led
+    input CLK,
+    input BTN,
+    input RST,
+    output TX_OUT,
+    output [5:0] LED
 );
 
-parameter integer WAIT_TIME = 13500000;
-reg [5:0] ledCounter = 0;
-reg [23:0] clockCounter = 0;
-
- wire debounced_btn;
-    debounce u_debounce (
-       .clk(clk),
-       .btn_in(btn_in),
-       .btn_out(debounced_btn)
+    // ---- Debounce ----
+    wire btn_debounced;
+    debounce debounce_inst (
+        .clk(CLK),
+        .pb_in(!BTN),
+        .pb_out(btn_debounced)
     );
 
-always @(posedge clk) begin
-    if (debounced_btn) begin
-        clockCounter <= clockCounter + 1;
-        if (clockCounter == WAIT_TIME) begin
-            clockCounter <= 0;
-            ledCounter <= ledCounter + 1;
-        end
+    // Edge detector: Pass the button signal to one cycle of clock
+    reg btn_prev;
+    always @(posedge CLK or negedge RST) begin
+        if (!RST) btn_prev <= 1'b0;
+        else btn_prev <= btn_debounced;
     end
-end
+    wire tx_en_pulse = btn_debounced && !btn_prev;
 
-assign led = ~ledCounter;
+    // Structural integration of the UART component
+    uart uart_inst (
+        .clk(CLK),
+        .rst(RST),
+        .tx_en(tx_en_pulse),
+        .tx(TX_OUT)
+    );
+
+    // Tie-off unused LEDs (active low)
+    assign LED = 6'b111111;
+
 endmodule
