@@ -64,6 +64,10 @@ jobs:
           -w /project \
           ghcr.io/${{ env.BITSTREAM_REPO }}/atelier:${{ env.IMAGE_TAG }} sleep infinity
 
+      - name: Validate Code Formatting
+        run: |
+          docker exec easel-${{ env.BITSTREAM_VERSION }} make check-format HDL=${{ env.HDL }}
+
       - name: Lint Source Files
         run: |
           docker exec easel-${{ env.BITSTREAM_VERSION }} make lint HDL=${{ env.HDL }}
