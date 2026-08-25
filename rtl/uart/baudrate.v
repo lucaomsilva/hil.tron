@@ -3,27 +3,27 @@ module baudrate #(
     parameter integer BAUDRATE  = 115200,    // buadrate required
     parameter integer BAUDCLOCK = 1          // number of tick in one BCLK
 ) (
-    input  wire clk,
-    input  wire rst,
-    output reg  bclk
+    input wire clk,
+    input wire rst,
+
+    output reg bclk
 );
 
-  localparam integer LIMITER = CLOCK / (BAUDRATE * BAUDCLOCK);
-  localparam integer COUNTER_WIDTH = $clog2(LIMITER);
+  // Use a 32-bit Phase Accumulator for zero-error frequency generation
+  // Formula: INCREMENT = (TARGET_FREQ * 2^32) / CLOCK_FREQ
+  // We use 64-bit math to prevent overflow during the multiplication
+  localparam [63:0] ACC_INC_64 = (64'd4294967296 * BAUDRATE * BAUDCLOCK) / CLOCK;
+  localparam [31:0] ACC_INC = ACC_INC_64[31:0];
 
-  reg [COUNTER_WIDTH-1:0] counter;
+  reg [31:0] acc;
 
   always @(posedge clk or negedge rst) begin
     if (!rst) begin
-      counter <= 0;
-      bclk <= 0;
+      acc  <= 32'b0;
+      bclk <= 1'b0;
     end else begin
-      if (counter < LIMITER / 2 - 1) begin
-        counter <= counter + 1;
-      end else begin
-        counter <= 0;
-        bclk <= ~bclk;
-      end
+      acc  <= acc + ACC_INC;
+      bclk <= acc[31];  // MSB is a perfect 50% duty cycle square wave
     end
   end
 
