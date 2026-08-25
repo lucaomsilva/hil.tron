@@ -4,6 +4,7 @@ module top (
 
     input BTN,
 
+    input  RX_IN,
     output TX_OUT,
 
     output [5:0] LED
@@ -25,15 +26,23 @@ module top (
   end
   wire tx_en_pulse = btn_debounced && !btn_prev;
 
+  wire [7:0] rx_data;
+  wire rx_ready;
+
   // ---- UART ----
   uart uart_inst (
       .clk(CLK),
       .rst(RST),
-      .tx_en(tx_en_pulse),
-      .tx(TX_OUT)
+      .tx_en(tx_en_pulse || rx_ready),
+      .tx_in(tx_en_pulse ? 8'h41 : rx_data),
+      .rx(RX_IN),
+      .tx(TX_OUT),
+      .rx_out(rx_data),
+      .rx_data_ready(rx_ready)
   );
 
-  // Tie-off unused LEDs (active low)
-  assign LED = 6'b111111;
+  // Display the received byte on the 6 onboard LEDs
+  // LEDs are active low, so we invert the data bits
+  assign LED = ~rx_data[5:0];
 
 endmodule
