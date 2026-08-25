@@ -6,7 +6,7 @@ module transmitter_shift_register #(
 
     input wire bclk,
 
-    input wire tsr_load,
+    input wire                  tsr_load,
     input wire [DATA_WIDTH-1:0] data_in,
 
     output reg tx_out,
@@ -52,7 +52,7 @@ module transmitter_shift_register #(
       shift_reg   <= {1'b1, shift_reg[REG_WIDTH-1:1]};
       bit_counter <= bit_counter - 1'b1;
 
-      if (bit_counter == 0) begin
+      if (bit_counter == 1) begin
         tsr_busy <= 1'b0;
       end
     end

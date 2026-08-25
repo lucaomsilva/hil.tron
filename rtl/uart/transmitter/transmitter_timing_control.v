@@ -34,10 +34,10 @@ module transmitter_timing_control (
       state    <= IDLE;
       tsr_load <= 1'b0;
     end else begin
+      tsr_load <= 1'b0;
       if (bclk_edge) begin
         case (state)
           IDLE: begin
-            tsr_load <= 1'b0;
             if (tx_start) begin
               state    <= LOAD;
               tsr_load <= 1'b1;
@@ -47,7 +47,6 @@ module transmitter_timing_control (
             state <= SHIFT;
           end
           SHIFT: begin
-            tsr_load <= 1'b0;
             if (!tsr_busy) begin
               state <= IDLE;
             end
