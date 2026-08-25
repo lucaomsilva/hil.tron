@@ -1,8 +1,11 @@
 module top (
     input CLK,
-    input BTN,
     input RST,
+
+    input BTN,
+
     output TX_OUT,
+
     output [5:0] LED
 );
 
@@ -22,7 +25,7 @@ module top (
   end
   wire tx_en_pulse = btn_debounced && !btn_prev;
 
-  // Structural integration of the UART component
+  // ---- UART ----
   uart uart_inst (
       .clk(CLK),
       .rst(RST),

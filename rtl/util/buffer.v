@@ -29,7 +29,7 @@ module buffer #(
   wire read_do = read_en && (buffer_count > 0);
 
   initial begin
-    buffer_empty = 1'b1;  // Initially, buffer is empty
+    buffer_empty = 1'b1;
   end
 
   always @(posedge clk or negedge rst) begin
