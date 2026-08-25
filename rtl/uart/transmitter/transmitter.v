@@ -46,6 +46,7 @@ module transmitter #(
 
   // ---- Transmitter Timing Control ----
   transmitter_timing_control transmitter_timing_control (
+      .clk(clk),
       .bclk(bclk),
       .rst(rst),
       .tx_start(not_empty),
@@ -55,6 +56,7 @@ module transmitter #(
 
   // ---- Transmitter Shift Register ----
   transmitter_shift_register transmitter_shift_register_inst (
+      .clk(clk),
       .bclk(bclk),
       .rst(rst),
       .tsr_load(tsr_load),

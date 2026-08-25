@@ -1,6 +1,9 @@
 module transmitter_timing_control (
-    input wire bclk,
+    input wire clk,
     input wire rst,
+
+    input wire bclk,
+
     input wire tx_start,
     input wire tsr_busy,
 
@@ -17,34 +20,43 @@ module transmitter_timing_control (
     tsr_load = 0;
   end
 
+  reg bclk_prev;
+  always @(posedge clk or negedge rst) begin
+    if (!rst) bclk_prev <= 1'b0;
+    else bclk_prev <= bclk;
+  end
+  wire bclk_edge = bclk && !bclk_prev;
+
   reg [$clog2(STATES)-1:0] state = IDLE;
 
-  always @(posedge bclk or negedge rst) begin
+  always @(posedge clk or negedge rst) begin
     if (!rst) begin
       state    <= IDLE;
       tsr_load <= 1'b0;
     end else begin
-      case (state)
-        IDLE: begin
-          tsr_load <= 1'b0;
-          if (tx_start) begin
-            state    <= LOAD;
-            tsr_load <= 1'b1;
+      if (bclk_edge) begin
+        case (state)
+          IDLE: begin
+            tsr_load <= 1'b0;
+            if (tx_start) begin
+              state    <= LOAD;
+              tsr_load <= 1'b1;
+            end
           end
-        end
-        LOAD: begin
-          state <= SHIFT;
-        end
-        SHIFT: begin
-          tsr_load <= 1'b0;
-          if (!tsr_busy) begin
+          LOAD: begin
+            state <= SHIFT;
+          end
+          SHIFT: begin
+            tsr_load <= 1'b0;
+            if (!tsr_busy) begin
+              state <= IDLE;
+            end
+          end
+          default: begin
             state <= IDLE;
           end
-        end
-        default: begin
-          state <= IDLE;
-        end
-      endcase
+        endcase
+      end
     end
   end
 
