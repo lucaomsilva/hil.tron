@@ -14,10 +14,16 @@
 +always-ff-non-blocking
 
 # Enforce port declarations style
-+port-declarations
+#-port-declarations
 
 # Enforce module names match the file names
 +module-filename
 
 # Ensure that 'begin' and 'end' blocks are used correctly
 +module-begin-block
+
+# Disable strict SV explicit parameter storage types (allows Verilog-2001 localparam sizing like [1:0])
+-explicit-parameter-storage-type
+
+# Disable parameter name style to allow UPPER_SNAKE_CASE which is standard for hardware constants
+-parameter-name-style

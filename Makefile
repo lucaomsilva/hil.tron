@@ -19,11 +19,11 @@ FS_FILE     = $(BUILD_DIR)/$(PROJ).fs
 
 # Verilog/VHDL/SystemVerilog source files
 ifeq ($(HDL),VHDL)
-SRCS        = $(wildcard $(SRC_DIR)/*.vhd)
+SRCS        = $(shell find $(SRC_DIR) -name '*.vhd')
 else ifeq ($(HDL),SystemVerilog)
-SRCS        = $(wildcard $(SRC_DIR)/*.sv)
+SRCS        = $(shell find $(SRC_DIR) -name '*.sv')
 else
-SRCS        = $(wildcard $(SRC_DIR)/*.v)
+SRCS        = $(shell find $(SRC_DIR) -name '*.v')
 endif
 
 # === Board Configuration (Tang Nano 9K) ===
@@ -66,9 +66,31 @@ lint: ## Run static analysis (linting) on source files
 ifeq ($(HDL),VHDL)
 	ghdl -s $(SRCS) || (echo -e "$(RED)Error: VHDL linting failed$(NC)"; exit 1)
 else
-	verible-verilog-lint $(SRCS) || (echo -e "$(RED)Error: Verilog/SV linting failed$(NC)"; exit 1)
+	verible-verilog-lint --rules_config=.rules.verible_lint $(SRCS) || (echo -e "$(RED)Error: Verilog/SV linting failed$(NC)"; exit 1)
 endif
 	@echo -e "$(GREEN)>> Linting complete.$(NC)"
+
+.PHONY: format
+format: ## Format Verilog source files
+	@echo -e "$(BLUE)>> Formatting $(HDL) source files...$(NC)"
+ifeq ($(HDL),VHDL)
+	@echo -e "$(YELLOW)Formatting VHDL is not currently supported.$(NC)"
+else
+	verible-verilog-format --inplace $(SRCS) || (echo -e "$(RED)Error: Verilog/SV formatting failed$(NC)"; exit 1)
+endif
+	@echo -e "$(GREEN)>> Formatting complete.$(NC)"
+
+.PHONY: check-format
+check-format: ## Check if Verilog source files are formatted correctly
+	@echo -e "$(BLUE)>> Checking formatting of $(HDL) source files...$(NC)"
+ifeq ($(HDL),VHDL)
+	@echo -e "$(YELLOW)Formatting check for VHDL is not currently supported.$(NC)"
+else
+	@for f in $(SRCS); do \
+		verible-verilog-format --verify $$f || (echo -e "$(RED)Error: $$f is not formatted properly. Run 'make format' or 'make docker-format'$(NC)"; exit 1); \
+	done
+endif
+	@echo -e "$(GREEN)>> Formatting check passed.$(NC)"
 
 # Default target: builds everything
 .PHONY: all
@@ -158,6 +180,16 @@ docker-shell: ## Start an interactive shell inside the Docker container
 docker-lint: ## Run 'make lint' inside the Docker container
 	@echo -e "$(BLUE)>> Running lint in container...$(NC)"
 	sudo docker run --rm --user $(HOST_UID):$(HOST_GID) -v $$(pwd):/home/painter/canvas:z -w /home/painter/canvas bitstream-flow:$(DOCKER_TAG) make lint HDL=$(HDL)
+
+.PHONY: docker-format
+docker-format: ## Run 'make format' inside the Docker container
+	@echo -e "$(BLUE)>> Running format in container...$(NC)"
+	sudo docker run --rm --user $(HOST_UID):$(HOST_GID) -v $$(pwd):/home/painter/canvas:z -w /home/painter/canvas bitstream-flow:$(DOCKER_TAG) make format HDL=$(HDL)
+
+.PHONY: docker-check-format
+docker-check-format: ## Run 'make check-format' inside the Docker container
+	@echo -e "$(BLUE)>> Running check-format in container...$(NC)"
+	sudo docker run --rm --user $(HOST_UID):$(HOST_GID) -v $$(pwd):/home/painter/canvas:z -w /home/painter/canvas bitstream-flow:$(DOCKER_TAG) make check-format HDL=$(HDL)
 
 .PHONY: docker-all
 docker-all: ## Run 'make all' inside the Docker container
