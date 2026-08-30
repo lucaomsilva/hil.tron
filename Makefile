@@ -164,6 +164,24 @@ install-tools: ## Install necessary tools and udev rules on the host
 	@echo -e "$(GREEN)>> Installation complete. Please replug your FPGA.$(NC)"
 	@rm -rf /tmp/openFPGALoader
 
+COPPELIA_VERSION ?= V4_6_0_rev18
+COPPELIA_OS      ?= Ubuntu22_04
+COPPELIA_URL     ?= https://downloads.coppeliarobotics.com/$(COPPELIA_VERSION)/CoppeliaSim_Edu_$(COPPELIA_VERSION)_$(COPPELIA_OS).tar.xz
+COPPELIA_DIR     ?= /opt/CoppeliaSim
+
+# Install CoppeliaSim
+.PHONY: install-coppelia
+install-coppelia: ## Install CoppeliaSim and Fedora dependencies
+	@echo -e "$(BLUE)>> Installing Fedora dependencies for CoppeliaSim...$(NC)"
+	@sudo dnf install -y xz tar qt5-qtbase qt5-qtsvg qt5-qtdeclarative libxcb libX11 mesa-libGLU || (echo -e "$(YELLOW)Warning: Failed to install some dependencies$(NC)")
+	@echo -e "$(BLUE)>> Downloading and installing CoppeliaSim...$(NC)"
+	@wget -O /tmp/coppeliasim.tar.xz $(COPPELIA_URL) || (echo -e "$(RED)Error downloading CoppeliaSim$(NC)"; exit 1)
+	@sudo mkdir -p $(COPPELIA_DIR)
+	@sudo tar -xJf /tmp/coppeliasim.tar.xz -C $(COPPELIA_DIR) --strip-components=1 || (echo -e "$(RED)Error extracting CoppeliaSim$(NC)"; exit 1)
+	@sudo ln -sf $(COPPELIA_DIR)/coppeliaSim.sh /usr/local/bin/coppeliasim
+	@rm -f /tmp/coppeliasim.tar.xz
+	@echo -e "$(GREEN)>> CoppeliaSim installed at $(COPPELIA_DIR). You can run it using 'coppeliasim' command.$(NC)"
+
 ##@ Docker Environment
 
 .PHONY: docker-build
