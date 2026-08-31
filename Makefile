@@ -164,6 +164,41 @@ install-tools: ## Install necessary tools and udev rules on the host
 	@echo -e "$(GREEN)>> Installation complete. Please replug your FPGA.$(NC)"
 	@rm -rf /tmp/openFPGALoader
 
+# Uninstall openFPGALoader and udev rules
+.PHONY: uninstall-tools
+uninstall-tools: ## Uninstall openFPGALoader and udev rules
+	@echo -e "$(YELLOW)>> Uninstalling openFPGALoader and udev rules...$(NC)"
+	@sudo rm -f /usr/local/bin/openFPGALoader
+	@sudo rm -rf /usr/local/share/openFPGALoader 2>/dev/null || true
+	@sudo rm -f /etc/udev/rules.d/99-openfpgaloader.rules
+	@sudo udevadm control --reload-rules && sudo udevadm trigger
+	@echo -e "$(GREEN)>> Uninstallation of tools complete.$(NC)"
+COPPELIA_VERSION ?= V4_6_0_rev18
+COPPELIA_OS      ?= Ubuntu22_04
+COPPELIA_URL     ?= https://downloads.coppeliarobotics.com/$(COPPELIA_VERSION)/CoppeliaSim_Edu_$(COPPELIA_VERSION)_$(COPPELIA_OS).tar.xz
+COPPELIA_DIR     ?= /opt/CoppeliaSim
+
+# Install CoppeliaSim
+.PHONY: install-coppelia
+install-coppelia: ## Install CoppeliaSim and Fedora dependencies
+	@echo -e "$(BLUE)>> Installing Fedora dependencies for CoppeliaSim...$(NC)"
+	@sudo dnf install -y xz tar qt5-qtbase qt5-qtsvg qt5-qtdeclarative libxcb libX11 mesa-libGLU libsodium || (echo -e "$(YELLOW)Warning: Failed to install some dependencies$(NC)")
+	@echo -e "$(BLUE)>> Downloading and installing CoppeliaSim...$(NC)"
+	@wget -O /tmp/coppeliasim.tar.xz $(COPPELIA_URL) || (echo -e "$(RED)Error downloading CoppeliaSim$(NC)"; exit 1)
+	@sudo mkdir -p $(COPPELIA_DIR)
+	@sudo tar -xJf /tmp/coppeliasim.tar.xz -C $(COPPELIA_DIR) --strip-components=1 || (echo -e "$(RED)Error extracting CoppeliaSim$(NC)"; exit 1)
+	@sudo ln -sf $(COPPELIA_DIR)/coppeliaSim.sh /usr/local/bin/coppeliasim
+	@rm -f /tmp/coppeliasim.tar.xz
+	@sudo ln -sf $$(find /usr/lib64 /usr/lib -name "libsodium.so*" 2>/dev/null | head -n 1) $(COPPELIA_DIR)/libsodium.so.23
+	@echo -e "$(GREEN)>> CoppeliaSim installed at $(COPPELIA_DIR). You can run it using 'coppeliasim' command.$(NC)"
+
+# Uninstall CoppeliaSim
+.PHONY: uninstall-coppelia
+uninstall-coppelia: ## Uninstall CoppeliaSim
+	@echo -e "$(YELLOW)>> Uninstalling CoppeliaSim from $(COPPELIA_DIR)...$(NC)"
+	@sudo rm -rf $(COPPELIA_DIR)
+	@sudo rm -f /usr/local/bin/coppeliasim
+	@echo -e "$(GREEN)>> Uninstallation of CoppeliaSim complete.$(NC)"
 ##@ Docker Environment
 
 .PHONY: docker-build
@@ -203,3 +238,13 @@ clean: ## Clean build directory
 	@echo -e "$(YELLOW)>> Cleaning build directory...$(NC)"
 	@rm -rf $(BUILD_DIR)
 	@echo -e "$(GREEN)>> Clean complete.$(NC)"
+
+##@ HIL Connection
+
+.PHONY: connection-build
+connection-build: ## Build the HIL connection software
+	@$(MAKE) -C ./software/hil.tron-connection build
+
+.PHONY: connection-clean
+connection-clean: ## Clean the HIL connection software
+	@$(MAKE) -C ./software/hil.tron-connection clean
