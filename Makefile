@@ -164,6 +164,15 @@ install-tools: ## Install necessary tools and udev rules on the host
 	@echo -e "$(GREEN)>> Installation complete. Please replug your FPGA.$(NC)"
 	@rm -rf /tmp/openFPGALoader
 
+# Uninstall openFPGALoader and udev rules
+.PHONY: uninstall-tools
+uninstall-tools: ## Uninstall openFPGALoader and udev rules
+	@echo -e "$(YELLOW)>> Uninstalling openFPGALoader and udev rules...$(NC)"
+	@sudo rm -f /usr/local/bin/openFPGALoader
+	@sudo rm -rf /usr/local/share/openFPGALoader 2>/dev/null || true
+	@sudo rm -f /etc/udev/rules.d/99-openfpgaloader.rules
+	@sudo udevadm control --reload-rules && sudo udevadm trigger
+	@echo -e "$(GREEN)>> Uninstallation of tools complete.$(NC)"
 COPPELIA_VERSION ?= V4_6_0_rev18
 COPPELIA_OS      ?= Ubuntu22_04
 COPPELIA_URL     ?= https://downloads.coppeliarobotics.com/$(COPPELIA_VERSION)/CoppeliaSim_Edu_$(COPPELIA_VERSION)_$(COPPELIA_OS).tar.xz
@@ -182,6 +191,13 @@ install-coppelia: ## Install CoppeliaSim and Fedora dependencies
 	@rm -f /tmp/coppeliasim.tar.xz
 	@echo -e "$(GREEN)>> CoppeliaSim installed at $(COPPELIA_DIR). You can run it using 'coppeliasim' command.$(NC)"
 
+# Uninstall CoppeliaSim
+.PHONY: uninstall-coppelia
+uninstall-coppelia: ## Uninstall CoppeliaSim
+	@echo -e "$(YELLOW)>> Uninstalling CoppeliaSim from $(COPPELIA_DIR)...$(NC)"
+	@sudo rm -rf $(COPPELIA_DIR)
+	@sudo rm -f /usr/local/bin/coppeliasim
+	@echo -e "$(GREEN)>> Uninstallation of CoppeliaSim complete.$(NC)"
 ##@ Docker Environment
 
 .PHONY: docker-build
