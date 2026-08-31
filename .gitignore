@@ -1,0 +1,20 @@
+# Python Cache
+__pycache__/
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
+.venv/
+env/
+.env/
+
+# Distribution
+dist/
+*.egg-info/
+
+# Software to test the HDL modules
+software/tmp/
+
+# HDL compiled files
+build/
