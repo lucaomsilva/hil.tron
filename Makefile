@@ -221,3 +221,13 @@ clean: ## Clean build directory
 	@echo -e "$(YELLOW)>> Cleaning build directory...$(NC)"
 	@rm -rf $(BUILD_DIR)
 	@echo -e "$(GREEN)>> Clean complete.$(NC)"
+
+##@ HIL Connection
+
+.PHONY: connection-build
+connection-build: ## Build the HIL connection software
+	@$(MAKE) -C ./software/hil.tron-connection build
+
+.PHONY: connection-clean
+connection-clean: ## Clean the HIL connection software
+	@$(MAKE) -C ./software/hil.tron-connection clean
