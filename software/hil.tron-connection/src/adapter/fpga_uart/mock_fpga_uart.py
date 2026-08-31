@@ -3,7 +3,7 @@ Adapter for serial communication with the FPGA.
 """
 from typing import List, Optional
 
-class FpgaUartAdapter:
+class MockFpgaUartAdapter:
     def __init__(self, port: str = "/dev/ttyUSB0", baudrate: int = 115200) -> None:
         self.port = port
         self.baudrate = baudrate

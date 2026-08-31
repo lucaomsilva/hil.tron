@@ -8,8 +8,9 @@ import os
 # Ensure the src directory is in the path for absolute imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from adapter.coppelia_client.mock_coppelia_client import MockCoppeliaClient
+from adapter.fpga_uart.mock_fpga_uart import MockFpgaUartAdapter
 from adapter.coppelia_client.coppelia_client import CoppeliaClient
-from adapter.fpga_uart.fpga_uart import FpgaUartAdapter
 from use_cases.coppelia_to_fpga.coppelia_to_fpga import CoppeliaToFpgaUseCase
 from use_cases.fpga_to_coppelia.fpga_to_coppelia import FpgaToCoppeliaUseCase
 
@@ -17,8 +18,9 @@ def main():
     print("Starting HIL Connection...")
     
     # 1. Initialize Adapters
+    # coppelia_client = MockCoppeliaClient()
     coppelia_client = CoppeliaClient()
-    fpga_adapter = FpgaUartAdapter()
+    fpga_adapter = MockFpgaUartAdapter()
     
     coppelia_client.connect()
     fpga_adapter.connect()
