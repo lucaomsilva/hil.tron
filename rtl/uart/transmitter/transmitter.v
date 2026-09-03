@@ -10,8 +10,12 @@ module transmitter #(
     input wire                  tx_en,
     input wire [DATA_WIDTH-1:0] tx_in,
 
-    output wire tx
+    output wire tx,
+    output wire tx_ready
 );
+
+  wire buffer_full;
+  assign tx_ready = !buffer_full;
 
   wire buffer_empty;
   wire not_empty = !buffer_empty;
@@ -32,7 +36,7 @@ module transmitter #(
       .read_en(tsr_load),
       .data_out(data_out_internal),
       .buffer_count(),
-      .buffer_full(),
+      .buffer_full(buffer_full),
       .buffer_empty(buffer_empty)
   );
 
