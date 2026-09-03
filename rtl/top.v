@@ -10,39 +10,55 @@ module top (
     output [5:0] LED
 );
 
-  // ---- Debounce ----
-  wire btn_debounced;
-  debounce debounce_inst (
-      .clk(CLK),
-      .pb_in(!BTN),
-      .pb_out(btn_debounced)
-  );
-
-  // Edge detector: Pass the button signal to one cycle of clock
-  reg btn_prev;
-  always @(posedge CLK or negedge RST) begin
-    if (!RST) btn_prev <= 1'b0;
-    else btn_prev <= btn_debounced;
-  end
-  wire tx_en_pulse = btn_debounced && !btn_prev;
-
+  // --- UART ---
   wire [7:0] rx_data;
   wire rx_ready;
+  wire rx_en;
 
-  // ---- UART ----
+  wire tx_ready;
+  wire tx_en;
+  wire [7:0] tx_data;
+
   uart uart_inst (
       .clk(CLK),
       .rst(RST),
-      .tx_en(tx_en_pulse || rx_ready),
-      .tx_in(tx_en_pulse ? 8'h41 : rx_data),
+      .tx_en(tx_en),
+      .tx_in(tx_data),
+      .tx_ready(tx_ready),
       .rx(RX_IN),
+      .rx_en(rx_en),
       .tx(TX_OUT),
       .rx_out(rx_data),
-      .rx_data_ready(rx_ready)
+      .rx_ready(rx_ready)
   );
 
-  // Display the received byte on the 6 onboard LEDs
-  // LEDs are active low, so we invert the data bits
-  assign LED = ~rx_data[5:0];
+  // --- Decode & Encode Loopback ---
+  wire [31:0] loop_data;
+  wire        loop_ready;
+  wire        loop_idle;
+
+  // --- Decode ---
+  decode decode_inst (
+      .clk(CLK),
+      .rst(RST),
+      .data_ready(rx_ready),
+      .data_encode(rx_data),
+      .decode_en(rx_en),
+      .decode_ready(loop_ready),
+      .data_decode(loop_data),
+      .decode_read(loop_idle)
+  );
+
+  // --- Encode ---
+  encode encode_inst (
+      .clk(CLK),
+      .rst(RST),
+      .encode_en(loop_ready),
+      .data_decode(loop_data),
+      .encode_idle(loop_idle),
+      .encode_ready(tx_en),
+      .encode_read(tx_ready),
+      .data_encode(tx_data)
+  );
 
 endmodule
