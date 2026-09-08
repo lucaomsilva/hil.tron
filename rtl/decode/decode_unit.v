@@ -34,7 +34,7 @@ module decode_unit (
         S_WAIT: begin
           if (data_ready) begin
             read_en <= 1'b1;
-            shift_reg <= {shift_reg[23:0], data_in};  // Big endian
+            shift_reg <= {data_in, shift_reg[31:8]};  // Little endian
             state <= S_READ;
           end
         end

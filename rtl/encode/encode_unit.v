@@ -49,8 +49,8 @@ module encode_unit (
         S_SEND: begin
           if (encode_read) begin
             buf_write_en <= 1'b1;
-            buf_data_in <= shift_reg[31:24];  // Big endian
-            shift_reg <= {shift_reg[23:0], 8'd0};
+            buf_data_in <= shift_reg[7:0];  // Little endian
+            shift_reg <= {8'd0, shift_reg[31:8]};
             state <= S_WAIT;
           end
         end
