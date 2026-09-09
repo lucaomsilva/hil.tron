@@ -11,9 +11,9 @@ module decode_unit (
     input  wire        decode_read
 );
 
-  localparam S_WAIT = 2'd0;
-  localparam S_READ = 2'd1;
-  localparam S_DONE = 2'd2;
+  localparam WAIT = 2'd0;
+  localparam READ = 2'd1;
+  localparam DONE = 2'd2;
 
   reg [ 1:0] state;
   reg [ 1:0] byte_count;
@@ -21,7 +21,7 @@ module decode_unit (
 
   always @(posedge clk or negedge rst) begin
     if (!rst) begin
-      state <= S_WAIT;
+      state <= WAIT;
       byte_count <= 2'd0;
       shift_reg <= 32'd0;
       decode_ready <= 1'b0;
@@ -31,32 +31,32 @@ module decode_unit (
       read_en <= 1'b0;  // Default
 
       case (state)
-        S_WAIT: begin
+        WAIT: begin
           if (data_ready) begin
             read_en <= 1'b1;
             shift_reg <= {data_in, shift_reg[31:8]};  // Little endian
-            state <= S_READ;
+            state <= READ;
           end
         end
-        S_READ: begin
+        READ: begin
           if (byte_count == 2'd3) begin
-            state <= S_DONE;
+            state <= DONE;
           end else begin
             byte_count <= byte_count + 1'b1;
-            state <= S_WAIT;
+            state <= WAIT;
           end
         end
-        S_DONE: begin
+        DONE: begin
           decode_ready <= 1'b1;
           data_out <= shift_reg;
           if (decode_read && decode_ready) begin
             decode_ready <= 1'b0;
             byte_count <= 2'd0;
-            state <= S_WAIT;
+            state <= WAIT;
           end
         end
         default: begin
-          state <= S_WAIT;
+          state <= WAIT;
         end
       endcase
     end
