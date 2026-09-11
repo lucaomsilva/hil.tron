@@ -6,7 +6,6 @@ module reference (
     input wire        write_en,
     input wire [31:0] data_in,
 
-    output wire state_out,
     output wire [31:0] data_out
 );
 
@@ -17,7 +16,6 @@ module reference (
   assign data_out = reference_reg;
 
   reg state;
-  assign state_out = state;
 
   always @(posedge clk or negedge rst) begin
     if (!rst) begin

@@ -106,7 +106,6 @@ module top (
     btn_prev <= btn_db;
   end
   wire btn_edge = btn_db && !btn_prev;
-  wire state;
   wire [31:0] reference_out;
 
   // --- Reference ---
@@ -116,7 +115,6 @@ module top (
       .reg_en(ref_en),
       .write_en(decode_ready),
       .data_in(decode_data),
-      .state_out(state),
       .data_out(reference_out)
   );
 
@@ -127,6 +125,6 @@ module top (
       .data_out (encode_data_in)
   );
 
-  assign LED[1] = state;
+  assign LED = 6'b111111;
 
 endmodule
