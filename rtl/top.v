@@ -10,39 +10,121 @@ module top (
     output [5:0] LED
 );
 
-  // ---- Debounce ----
-  wire btn_debounced;
-  debounce debounce_inst (
-      .clk(CLK),
-      .pb_in(!BTN),
-      .pb_out(btn_debounced)
-  );
-
-  // Edge detector: Pass the button signal to one cycle of clock
-  reg btn_prev;
-  always @(posedge CLK or negedge RST) begin
-    if (!RST) btn_prev <= 1'b0;
-    else btn_prev <= btn_debounced;
-  end
-  wire tx_en_pulse = btn_debounced && !btn_prev;
-
+  // --- UART ---
   wire [7:0] rx_data;
   wire rx_ready;
+  wire rx_en;
 
-  // ---- UART ----
+  wire tx_ready;
+  wire tx_en;
+  wire [7:0] tx_data;
+
   uart uart_inst (
       .clk(CLK),
-      .rst(RST),
-      .tx_en(tx_en_pulse || rx_ready),
-      .tx_in(tx_en_pulse ? 8'h41 : rx_data),
+      .rst(1'b1),
+      .tx_en(tx_en),
+      .tx_in(tx_data),
+      .tx_ready(tx_ready),
       .rx(RX_IN),
+      .rx_en(rx_en),
       .tx(TX_OUT),
       .rx_out(rx_data),
-      .rx_data_ready(rx_ready)
+      .rx_ready(rx_ready)
   );
 
-  // Display the received byte on the 6 onboard LEDs
-  // LEDs are active low, so we invert the data bits
-  assign LED = ~rx_data[5:0];
+  // --- Input Control ---
+  wire decode_en;
+  wire decode_free;
+  wire decode_ready;
+  wire decode_read;
+  wire ref_en;
+
+  input_control input_control_inst (
+      .clk(CLK),
+      .rst(1'b1),
+      .opcode_en(rx_ready),
+      .opcode(rx_data),
+      .opcode_done(rx_en),
+      .decode_en(decode_en),
+      .decode_free(decode_free),
+      .decode_ready(decode_ready),
+      .decode_read(decode_read),
+      .ref_en(ref_en)
+  );
+
+  // --- Decode & Encode Loopback ---
+  wire [31:0] decode_data;
+
+  // --- Decode ---
+  decode decode_inst (
+      .clk(CLK),
+      .rst(1'b1),
+      .decode_en(decode_en),
+      .data_in(rx_data),
+      .decode_free(decode_free),
+      .decode_ready(decode_ready),
+      .decode_data(decode_data),
+      .decode_read(decode_read)
+  );
+
+  wire [31:0] encode_data_in;
+  wire rst_db;
+
+  debounce debounce_rst (
+      .clk(CLK),
+      .pb_in(RST),
+      .pb_out(rst_db)
+  );
+
+  reg rst_prev;
+  always @(posedge CLK) begin
+    rst_prev <= rst_db;
+  end
+  wire rst_edge = rst_db && !rst_prev;
+
+  // --- Encode ---
+  encode encode_inst (
+      .clk(CLK),
+      .rst(1'b1),
+      .encode_en(btn_edge),
+      .data_decode(encode_data_in),
+      .encode_idle(),
+      .encode_ready(tx_en),
+      .encode_read(tx_ready),
+      .data_encode(tx_data)
+  );
+
+  wire btn_db;
+  debounce debounce_btn (
+      .clk(CLK),
+      .pb_in(BTN),
+      .pb_out(btn_db)
+  );
+
+  reg btn_prev;
+  always @(posedge CLK) begin
+    btn_prev <= btn_db;
+  end
+  wire btn_edge = btn_db && !btn_prev;
+  wire [31:0] reference_out;
+
+  // --- Reference ---
+  reference reference_inst (
+      .clk(CLK),
+      .rst(1'b1),
+      .reg_en(ref_en),
+      .write_en(decode_ready),
+      .data_in(decode_data),
+      .data_out(reference_out)
+  );
+
+  // --- Controller ---
+  controller controller_inst (
+      .reference(reference_out),
+      .data_in  (decode_data),
+      .data_out (encode_data_in)
+  );
+
+  assign LED = 6'b111111;
 
 endmodule

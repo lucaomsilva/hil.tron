@@ -1,0 +1,71 @@
+module encode_unit (
+    input wire clk,
+    input wire rst,
+
+    input  wire        encode_en,
+    input  wire [31:0] data_in,
+    output reg         idle,
+
+    input  wire       encode_read,
+    output wire [7:0] data_out,
+    output wire       encode_ready
+);
+
+  localparam IDLE = 2'd0;
+  localparam SEND = 2'd1;
+  localparam WAIT = 2'd2;
+
+  reg [1:0] state;
+  reg [1:0] byte_count;
+  reg [31:0] shift_reg;
+
+  reg [7:0] buf_data_in;
+  reg buf_write_en;
+
+  assign data_out = buf_data_in;
+  assign encode_ready = buf_write_en;
+
+  always @(posedge clk or negedge rst) begin
+    if (!rst) begin
+      state <= IDLE;
+      byte_count <= 2'd0;
+      shift_reg <= 32'd0;
+      idle <= 1'b1;
+      buf_write_en <= 1'b0;
+      buf_data_in <= 8'd0;
+    end else begin
+      buf_write_en <= 1'b0;  // default
+
+      case (state)
+        IDLE: begin
+          idle <= 1'b1;
+          if (encode_en) begin
+            idle <= 1'b0;
+            shift_reg <= data_in;
+            byte_count <= 2'd0;
+            state <= SEND;
+          end
+        end
+        SEND: begin
+          if (encode_read) begin
+            buf_write_en <= 1'b1;
+            buf_data_in <= shift_reg[7:0];  // Little endian
+            shift_reg <= {8'd0, shift_reg[31:8]};
+            state <= WAIT;
+          end
+        end
+        WAIT: begin
+          if (byte_count == 2'd3) begin
+            state <= IDLE;
+          end else begin
+            byte_count <= byte_count + 1'b1;
+            state <= SEND;
+          end
+        end
+        default: begin
+          state <= IDLE;
+        end
+      endcase
+    end
+  end
+endmodule

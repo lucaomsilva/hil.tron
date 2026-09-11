@@ -9,14 +9,16 @@ module uart #(
     input wire clk,
     input wire rst,
 
-    input wire                  tx_en,
-    input wire [DATA_WIDTH-1:0] tx_in,
+    input  wire                  tx_en,
+    input  wire [DATA_WIDTH-1:0] tx_in,
+    output wire                  tx_ready,
 
     input wire rx,
+    input wire rx_en,
 
     output wire tx,
 
-    output wire                  rx_data_ready,
+    output wire                  rx_ready,
     output wire [DATA_WIDTH-1:0] rx_out
 );
 
@@ -54,7 +56,8 @@ module uart #(
       .rst(rst),
       .tx_en(tx_en),
       .tx_in(tx_in),
-      .tx(tx)
+      .tx(tx),
+      .tx_ready(tx_ready)
   );
 
   // ---- Receiver ----
@@ -66,9 +69,9 @@ module uart #(
       .rst(rst),
       .bclk(bclk_16x),
       .rx(rx),
-      .rx_en(rx_data_ready),
+      .rx_en(rx_en),
       .rx_out(rx_out),
-      .data_ready(rx_data_ready)
+      .rx_ready(rx_ready)
   );
 
 endmodule

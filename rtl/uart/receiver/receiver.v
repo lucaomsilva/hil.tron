@@ -11,14 +11,14 @@ module receiver #(
     input wire rx_en,
 
     output wire [DATA_WIDTH-1:0] rx_out,
-    output wire                  data_ready
+    output wire                  rx_ready
 );
   wire rsr_load;
   wire rx_done;
   wire [DATA_WIDTH-1:0] shift_data_out;
   wire buffer_empty;
 
-  assign data_ready = !buffer_empty;
+  assign rx_ready = !buffer_empty;
 
   // ---- Receiver Timing Control ----
   receiver_timing_control receiver_timing_control_inst (
