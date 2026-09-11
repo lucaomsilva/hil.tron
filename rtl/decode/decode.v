@@ -2,12 +2,12 @@ module decode (
     input wire clk,
     input wire rst,
 
-    input  wire       data_ready,
-    input  wire [7:0] data_encode,
-    output wire       decode_en,
+    input  wire       decode_en,
+    input  wire [7:0] data_in,
+    output wire       decode_free,
 
     output wire        decode_ready,
-    output wire [31:0] data_decode,
+    output wire [31:0] decode_data,
     input  wire        decode_read
 );
 
@@ -16,7 +16,7 @@ module decode (
   wire buf_full;
   wire unit_read_en;
 
-  assign decode_en = ~buf_full;
+  assign decode_free = ~buf_full;
 
   decode_unit decode_unit_inst (
       .clk(clk),
@@ -25,7 +25,7 @@ module decode (
       .data_in(buf_data_out),
       .read_en(unit_read_en),
       .decode_ready(decode_ready),
-      .data_out(data_decode),
+      .data_out(decode_data),
       .decode_read(decode_read)
   );
 
@@ -35,8 +35,8 @@ module decode (
   ) rx_buffer (
       .clk(clk),
       .rst(rst),
-      .data_in(data_encode),
-      .write_en(data_ready),
+      .data_in(data_in),
+      .write_en(decode_en),
       .read_en(unit_read_en),
       .data_out(buf_data_out),
       .buffer_count(),
