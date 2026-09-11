@@ -32,20 +32,39 @@ module top (
       .rx_ready(rx_ready)
   );
 
+  // --- Input Control ---
+  wire decode_en;
+  wire decode_free;
+  wire decode_ready;
+  wire decode_read;
+  wire ref_en;
+
+  input_control input_control_inst (
+      .clk(CLK),
+      .rst(1'b1),
+      .opcode_en(rx_ready),
+      .opcode(rx_data),
+      .opcode_done(rx_en),
+      .decode_en(decode_en),
+      .decode_free(decode_free),
+      .decode_ready(decode_ready),
+      .decode_read(decode_read),
+      .ref_en(ref_en)
+  );
+
   // --- Decode & Encode Loopback ---
-  wire [31:0] decode_data_out;
-  wire        decode_ready;
+  wire [31:0] decode_data;
 
   // --- Decode ---
   decode decode_inst (
       .clk(CLK),
       .rst(1'b1),
-      .data_ready(rx_ready),
-      .data_encode(rx_data),
-      .decode_en(rx_en),
+      .decode_en(decode_en),
+      .data_in(rx_data),
+      .decode_free(decode_free),
       .decode_ready(decode_ready),
-      .data_decode(decode_data_out),
-      .decode_read(decode_ready)
+      .decode_data(decode_data),
+      .decode_read(decode_read)
   );
 
   wire [31:0] encode_data_in;
@@ -94,9 +113,9 @@ module top (
   reference reference_inst (
       .clk(CLK),
       .rst(1'b1),
-      .reg_en(rst_edge),
+      .reg_en(ref_en),
       .write_en(decode_ready),
-      .data_in(decode_data_out),
+      .data_in(decode_data),
       .state_out(state),
       .data_out(reference_out)
   );
@@ -104,7 +123,7 @@ module top (
   // --- Controller ---
   controller controller_inst (
       .reference(reference_out),
-      .data_in  (decode_data_out),
+      .data_in  (decode_data),
       .data_out (encode_data_in)
   );
 
