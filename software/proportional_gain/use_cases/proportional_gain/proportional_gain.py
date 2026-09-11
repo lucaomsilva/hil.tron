@@ -20,18 +20,25 @@ class ProportionalGain:
         print(f"Reference Value: {reference_value} (0x{reference_value & 0xFFFFFFFF:08X})")
         print(f"Input Value: {input_value} (0x{input_value & 0xFFFFFFFF:08X})")
 
-        # 1. Convert to bytes
-        ref_bytes = DataConverter.int32_to_bytes(reference_value)
-        input_bytes = DataConverter.int32_to_bytes(input_value)
+        # 1. Convert to bytes (Little Endian as per FPGA implementation)
+        ref_bytes = DataConverter.int32_to_bytes(reference_value, byteorder='little')
+        input_bytes = DataConverter.int32_to_bytes(input_value, byteorder='little')
 
-        # 2. Transmit Reference Value
-        print(f"-> Sending Reference Bytes: {ref_bytes.hex().upper()}")
+        # 2. Add Opcodes (0x01 = Reference, 0x00 = Controller Input)
+        OPCODE_CONTROLLER = b'\x00'
+        OPCODE_REFERENCE = b'\x01'
+
+        ref_packet = OPCODE_REFERENCE + ref_bytes
+        input_packet = OPCODE_CONTROLLER + input_bytes
+
+        # 3. Transmit Reference Value
+        print(f"-> Sending Reference Packet: {ref_packet.hex().upper()}")
         input("press ENTER to send")
-        self.uart.send_bytes(ref_bytes)
+        self.uart.send_bytes(ref_packet)
 
-        # 3. Transmit Input Value
-        print(f"-> Sending Input Bytes: {input_bytes.hex().upper()}")
-        self.uart.send_bytes(input_bytes)
+        # 4. Transmit Input Value
+        print(f"-> Sending Input Packet: {input_packet.hex().upper()}")
+        self.uart.send_bytes(input_packet)
 
         # 4. Receive Result (4 bytes for a 32-bit result)
         print("<- Waiting for 32-bit Result (4 bytes)...")
