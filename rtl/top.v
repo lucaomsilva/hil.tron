@@ -110,14 +110,14 @@ module top (
 
   // --- Controller ---
   wire encode_en;
-  
+
   controller controller_inst (
       .clk(CLK),
       .rst(1'b1),
       .control_en(control_en),
       .reference(reference_out),
-      .data_in  (decode_data),
-      .data_out (encode_data_in),
+      .data_in(decode_data),
+      .data_out(encode_data_in),
       .encode_en(encode_en)
   );
 
