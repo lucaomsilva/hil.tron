@@ -15,7 +15,10 @@ module input_control (
     output reg  decode_read,
 
     // Reference Interface
-    output reg ref_en
+    output reg ref_en,
+
+    // Control Interface
+    output reg control_en
 );
 
   localparam IDLE = 2'd0;
@@ -37,9 +40,11 @@ module input_control (
       state <= IDLE;
       decode_read <= 1'b0;
       ref_en <= 1'b0;
+      control_en <= 1'b0;
     end else begin
       decode_read <= 1'b0;
       ref_en <= 1'b0;
+      control_en <= 1'b0;
 
       case (state)
         IDLE: begin
@@ -68,6 +73,7 @@ module input_control (
         WAIT: begin
           if (decode_ready) begin
             decode_read <= 1'b1;
+            control_en <= 1'b1;
             state <= IDLE;
           end
         end

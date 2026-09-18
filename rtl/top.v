@@ -38,6 +38,7 @@ module top (
   wire decode_ready;
   wire decode_read;
   wire ref_en;
+  wire control_en;
 
   input_control input_control_inst (
       .clk(CLK),
@@ -49,7 +50,8 @@ module top (
       .decode_free(decode_free),
       .decode_ready(decode_ready),
       .decode_read(decode_read),
-      .ref_en(ref_en)
+      .ref_en(ref_en),
+      .control_en(control_en)
   );
 
   // --- Decode & Encode Loopback ---
@@ -86,7 +88,7 @@ module top (
   encode encode_inst (
       .clk(CLK),
       .rst(1'b1),
-      .encode_en(btn_edge),
+      .encode_en(encode_en),
       .data_decode(encode_data_in),
       .encode_idle(),
       .encode_ready(tx_en),
@@ -94,18 +96,6 @@ module top (
       .data_encode(tx_data)
   );
 
-  wire btn_db;
-  debounce debounce_btn (
-      .clk(CLK),
-      .pb_in(BTN),
-      .pb_out(btn_db)
-  );
-
-  reg btn_prev;
-  always @(posedge CLK) begin
-    btn_prev <= btn_db;
-  end
-  wire btn_edge = btn_db && !btn_prev;
   wire [31:0] reference_out;
 
   // --- Reference ---
@@ -119,10 +109,16 @@ module top (
   );
 
   // --- Controller ---
+  wire encode_en;
+
   controller controller_inst (
+      .clk(CLK),
+      .rst(1'b1),
+      .control_en(control_en),
       .reference(reference_out),
-      .data_in  (decode_data),
-      .data_out (encode_data_in)
+      .data_in(decode_data),
+      .data_out(encode_data_in),
+      .encode_en(encode_en)
   );
 
   assign LED = 6'b111111;
