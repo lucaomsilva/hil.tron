@@ -133,8 +133,8 @@ module top (
       .control_en(control_en),
       .setpoint(setpoint_out),
       .kp(kp_out),
-      .data_in(decode_data),
-      .data_out(encode_data_in),
+      .feedback(decode_data),
+      .control_out(encode_data_in),
       .encode_en(encode_en)
   );
 
