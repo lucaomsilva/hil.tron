@@ -39,6 +39,7 @@ module top (
   wire decode_read;
   wire ref_en;
   wire control_en;
+  wire kp_en;
 
   input_control input_control_inst (
       .clk(CLK),
@@ -51,7 +52,8 @@ module top (
       .decode_ready(decode_ready),
       .decode_read(decode_read),
       .ref_en(ref_en),
-      .control_en(control_en)
+      .control_en(control_en),
+      .kp_en(kp_en)
   );
 
   // --- Decode & Encode Loopback ---
@@ -99,13 +101,27 @@ module top (
   wire [31:0] reference_out;
 
   // --- Reference ---
-  reference reference_inst (
+  register reference_inst (
       .clk(CLK),
       .rst(1'b1),
       .reg_en(ref_en),
       .write_en(decode_ready),
       .data_in(decode_data),
       .data_out(reference_out)
+  );
+
+  // --- Kp Register ---
+  wire [31:0] kp_out;
+
+  register #(
+      .INIT_VAL(32'h00058000)
+  ) kp_register_inst (
+      .clk(CLK),
+      .rst(1'b1),
+      .reg_en(kp_en),
+      .write_en(decode_ready),
+      .data_in(decode_data),
+      .data_out(kp_out)
   );
 
   // --- Controller ---
@@ -116,6 +132,7 @@ module top (
       .rst(1'b1),
       .control_en(control_en),
       .reference(reference_out),
+      .kp(kp_out),
       .data_in(decode_data),
       .data_out(encode_data_in),
       .encode_en(encode_en)

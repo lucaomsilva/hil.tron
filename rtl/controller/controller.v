@@ -1,12 +1,11 @@
-module controller #(
-    parameter signed [31:0] Kp = 32'h00058000
-) (
+module controller (
     input wire clk,
     input wire rst,
 
     input wire control_en,
 
     input wire [31:0] reference,
+    input wire [31:0] kp,
     input wire [31:0] data_in,
 
     output reg [31:0] data_out,
@@ -27,7 +26,7 @@ module controller #(
       if (control_en) begin
           error = $signed(reference) - $signed(data_in);
 
-          p_prod_full = $signed(Kp) * error;
+          p_prod_full = $signed(kp) * error;
 
           if (p_prod_full[64:63] == 2'b01) p_product = 64'h7FFFFFFFFFFFFFFF;
           else if (p_prod_full[64:63] == 2'b10) p_product = 64'h8000000000000000;
