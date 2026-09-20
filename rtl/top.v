@@ -98,16 +98,16 @@ module top (
       .data_encode(tx_data)
   );
 
-  wire [31:0] reference_out;
+  // --- Setpoint ---
+  wire [31:0] setpoint_out;
 
-  // --- Reference ---
-  register reference_inst (
+  register setpoint_inst (
       .clk(CLK),
       .rst(1'b1),
       .reg_en(ref_en),
       .write_en(decode_ready),
       .data_in(decode_data),
-      .data_out(reference_out)
+      .data_out(setpoint_out)
   );
 
   // --- Kp Register ---
@@ -131,7 +131,7 @@ module top (
       .clk(CLK),
       .rst(1'b1),
       .control_en(control_en),
-      .reference(reference_out),
+      .setpoint(setpoint_out),
       .kp(kp_out),
       .data_in(decode_data),
       .data_out(encode_data_in),

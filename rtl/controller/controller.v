@@ -4,7 +4,7 @@ module controller (
 
     input wire control_en,
 
-    input wire [31:0] reference,
+    input wire [31:0] setpoint,
     input wire [31:0] kp,
     input wire [31:0] data_in,
 
@@ -24,7 +24,7 @@ module controller (
     end else begin
       encode_en <= 1'b0;
       if (control_en) begin
-          error = $signed(reference) - $signed(data_in);
+          error = $signed(setpoint) - $signed(data_in);
 
           p_prod_full = $signed(kp) * error;
 
