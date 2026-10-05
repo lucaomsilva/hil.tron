@@ -65,9 +65,9 @@ python3 -m venv venv
 sudo venv/bin/python3 -m pip install pyserial numpy matplotlib control
 ```
 
-## HIL Simulation Script
+## V2 HIL Simulation Script (Difference Equations)
 
-The complete simulation script used to generate these results is provided below. This script defines the continuous plant, converts it to discrete difference equations, configures the FPGA over UART using the new opcodes, runs the Hardware-in-the-Loop test, and plots the results.
+The simulation script used to generate these results is provided below. This script defines the continuous plant, converts it to discrete difference equations, configures the FPGA over UART using the new opcodes, runs the Hardware-in-the-Loop test, and plots the results.
 
 ```python
 import serial
@@ -257,9 +257,171 @@ if __name__ == '__main__':
     main()
 ```
 
+### V2 State-Space Simulation Script
+
+Alternatively, you can simulate the physical plant using State-Space matrix multiplication (`A`, `B`, `C`, `D`) instead of difference equations. The script below performs the exact same Hardware-in-the-Loop test but utilizes matrix math, allowing it to naturally scale to higher-order systems without modifying the loop.
+
+```python
+import serial
+import time
+import struct
+import sys
+import numpy as np
+import matplotlib.pyplot as plt
+import control as ct
+
+def main():
+    # 1. Setup Serial Port
+    port = '/dev/ttyUSB1'
+    baudrate = 115200
+ 
+    try:
+        ser = serial.Serial(port, baudrate, timeout=2.0)
+        print(f"Opened {port} at {baudrate} baud.")
+    except Exception as e:
+        print(f"Error opening serial port: {e}")
+        sys.exit(1)
+
+    # 2. Define the Plant using Python Control Library
+    K_plant = 1.0
+    tau = 1.0
+    sys_c = ct.tf([K_plant], [tau, 1])
+    print(f"\nContinuous Plant Transfer Function:\n{sys_c}")
+
+    # Convert to Discrete State-Space
+    dt = 0.01 # 10 ms sample time
+    sys_d = ct.sample_system(sys_c, dt, method='zoh')
+    ss_d = ct.tf2ss(sys_d)
+
+    A, B, C, D = ss_d.A, ss_d.B, ss_d.C, ss_d.D
+
+    # 3. Setup HIL Simulation Parameters
+    setpoint_float = 500.0
+    setpoint_q16 = int(setpoint_float * 65536)
+
+    # Send Setpoint Packet (Opcode 0x01)
+    setpoint_bytes = struct.pack('<i', setpoint_q16)
+    setpoint_packet = b'\x01' + setpoint_bytes
+    print(f"Sending setpoint: {setpoint_float:.4f}")
+    ser.write(setpoint_packet)
+
+    time.sleep(0.01)
+
+    kp_float = 15.75
+    kp_q16 = int(kp_float * 65536)
+
+    # Send Kp Packet (Opcode 0x02)
+    kp_bytes = struct.pack('<i', kp_q16)
+    kp_packet = b'\x02' + kp_bytes
+    print(f"Sending Kp: {kp_float:.4f}")
+    ser.write(kp_packet)
+
+    time.sleep(0.01)
+
+    # 4. Run the HIL Simulation Loop
+    num_steps = 200  # 2.0 seconds of simulation
+
+    print("A")
+    print(A)
+    print("B")
+    print(B)
+    print("C")
+    print(C)
+    print("D")
+    print(D)
+
+    x = np.zeros((A.shape[0], 1))
+    x_open = np.zeros((A.shape[0], 1))
+
+    history_t = []
+    history_y = []
+    history_y_open = []
+    history_u = []
+    history_setpoint = []
+
+    print("\nStarting State-Space HIL Simulation...")
+    start_sim_time = time.time()
+
+    for k in range(num_steps):
+        # Calculate current output using state-space matrices
+        y_float = float((C @ x).item())
+        y_open_float = float((C @ x_open).item())
+
+        # Quantize to Q16.16 format for the FPGA
+        y_q16 = int(y_float * 65536)
+
+        # Send current plant output (feedback) to FPGA (Opcode 0x00)
+        data_packet = b'\x00' + struct.pack('<i', y_q16)
+        ser.write(data_packet)
+
+        # Wait for the control signal (u) from FPGA
+        response = ser.read(4)
+
+        if len(response) == 4:
+            u_q16 = struct.unpack('<i', response)[0]
+            u_float = u_q16 / 65536.0
+        else:
+            print(f"Error: Step {k} failed to receive full response. Using u = 0.")
+            u_float = 0.0
+
+        # Update the plant states
+        x = A @ x + B * u_float
+        x_open = A @ x_open + B * setpoint_float
+
+        # Record history for plotting
+        t = k * dt
+        history_t.append(t)
+        history_y.append(y_float)
+        history_u.append(u_float)
+        history_setpoint.append(setpoint_float)
+        history_y_open.append(y_open_float)
+
+    ser.close()
+    print(f"Simulation finished in {time.time() - start_sim_time:.2f} seconds.")
+
+    # 5. Plot the Results
+    plt.figure(figsize=(10, 8))
+
+    plt.subplot(2, 1, 1)
+    plt.plot(history_t, history_y, label='Plant Output (Closed-Loop)', color='blue', linewidth=2)
+    plt.plot(history_t, history_setpoint, label='Setpoint', color='red', linestyle='--')
+    plt.title('State-Space HIL - With Control (Closed-Loop)')
+    plt.ylabel('Amplitude')
+    plt.grid(True)
+    plt.legend()
+
+    plt.subplot(2, 1, 2)
+    plt.plot(history_t, history_u, label='Control Signal (FPGA)', color='green')
+    plt.title('Controller Effort')
+    plt.xlabel('Time (seconds)')
+    plt.ylabel('Control Signal (u)')
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig('hil_with_control_ss.png')
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(history_t, history_y_open, label='Plant Output (Open-Loop)', color='orange', linewidth=2)
+    plt.plot(history_t, history_setpoint, label='Setpoint (Input Step)', color='red', linestyle='--')
+    plt.title('State-Space Simulation - Without Control (Open-Loop)')
+    plt.xlabel('Time (seconds)')
+    plt.ylabel('Amplitude')
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig('hil_without_control_ss.png')
+
+    print("\nPlots saved as 'hil_with_control_ss.png' and 'hil_without_control_ss.png'")
+
+if __name__ == '__main__':
+    main()
+```
+
 ### Run Script
 
-Inside the script folder, after the [Dependencies](#dependencies) commands have been run, execute the following command to run the simulation:
+Inside the script folder, after the [Dependencies](#dependencies) commands have been run, execute one of the following commands to run the simulation:
 
 ```bash
 sudo venv/bin/python3 main.py
