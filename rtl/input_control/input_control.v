@@ -18,7 +18,8 @@ module input_control (
     output reg ref_en,
 
     // Control Interface
-    output reg control_en
+    output reg control_en,
+    output reg kp_en
 );
 
   localparam IDLE = 2'd0;
@@ -27,6 +28,7 @@ module input_control (
 
   reg [1:0] state;
   reg [2:0] byte_count;
+  reg is_data_opcode;
 
   assign opcode_done = (state == IDLE) ? 1'b1 : (state == DATA) ? decode_free : 1'b0;
 
@@ -41,22 +43,45 @@ module input_control (
       decode_read <= 1'b0;
       ref_en <= 1'b0;
       control_en <= 1'b0;
+      kp_en <= 1'b0;
+      is_data_opcode <= 1'b0;
     end else begin
       decode_read <= 1'b0;
       ref_en <= 1'b0;
       control_en <= 1'b0;
+      kp_en <= 1'b0;
 
       case (state)
         IDLE: begin
           if (opcode_transfer) begin
-            if (opcode == 8'h00 || opcode == 8'h01) begin
-              state <= DATA;
-              byte_count <= 3'd0;
-
-              if (opcode == 8'h01) begin
-                ref_en <= 1'b1;
+            case (opcode)
+              8'h00: begin
+                state <= DATA;
+                byte_count <= 3'd0;
+                is_data_opcode <= 1'b1;
+                ref_en <= 1'b0;
+                kp_en <= 1'b0;
               end
-            end
+              8'h01: begin
+                state <= DATA;
+                byte_count <= 3'd0;
+                is_data_opcode <= 1'b0;
+                ref_en <= 1'b1;
+                kp_en <= 1'b0;
+              end
+              8'h02: begin
+                state <= DATA;
+                byte_count <= 3'd0;
+                is_data_opcode <= 1'b0;
+                ref_en <= 1'b0;
+                kp_en <= 1'b1;
+              end
+              default: begin
+                is_data_opcode <= 1'b0;
+                ref_en <= 1'b0;
+                kp_en <= 1'b0;
+              end
+            endcase
           end
         end
 
@@ -73,7 +98,9 @@ module input_control (
         WAIT: begin
           if (decode_ready) begin
             decode_read <= 1'b1;
-            control_en <= 1'b1;
+            if (is_data_opcode) begin
+              control_en <= 1'b1;
+            end
             state <= IDLE;
           end
         end

@@ -1,4 +1,6 @@
-module reference (
+module register #(
+    parameter [31:0] INIT_VAL = 32'd0
+) (
     input wire clk,
     input wire rst,
 
@@ -12,15 +14,15 @@ module reference (
   localparam IDLE = 1'b0;
   localparam SAVE = 1'b1;
 
-  reg [31:0] reference_reg;
-  assign data_out = reference_reg;
+  reg [31:0] data_reg;
+  assign data_out = data_reg;
 
   reg state;
 
   always @(posedge clk or negedge rst) begin
     if (!rst) begin
-      state         <= IDLE;
-      reference_reg <= 32'd0;
+      state    <= IDLE;
+      data_reg <= INIT_VAL;
     end else begin
       case (state)
         IDLE: begin
@@ -30,8 +32,8 @@ module reference (
         end
         SAVE: begin
           if (write_en) begin
-            state         <= IDLE;
-            reference_reg <= data_in;
+            state    <= IDLE;
+            data_reg <= data_in;
           end
         end
         default: begin

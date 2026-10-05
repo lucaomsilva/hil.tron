@@ -1,15 +1,14 @@
-module controller #(
-    parameter signed [31:0] Kp = 32'h00058000
-) (
+module controller (
     input wire clk,
     input wire rst,
 
     input wire control_en,
 
-    input wire [31:0] reference,
-    input wire [31:0] data_in,
+    input wire [31:0] setpoint,
+    input wire [31:0] kp,
+    input wire [31:0] feedback,
 
-    output reg [31:0] data_out,
+    output reg [31:0] control_out,
     output reg encode_en
 );
 
@@ -20,14 +19,14 @@ module controller #(
 
   always @(posedge clk or negedge rst) begin
     if (!rst) begin
-      data_out  <= 32'd0;
+      control_out <= 32'd0;
       encode_en <= 1'b0;
     end else begin
       encode_en <= 1'b0;
       if (control_en) begin
-          error = $signed(reference) - $signed(data_in);
+          error = $signed(setpoint) - $signed(feedback);
 
-          p_prod_full = $signed(Kp) * error;
+          p_prod_full = $signed(kp) * error;
 
           if (p_prod_full[64:63] == 2'b01) p_product = 64'h7FFFFFFFFFFFFFFF;
           else if (p_prod_full[64:63] == 2'b10) p_product = 64'h8000000000000000;
@@ -35,9 +34,9 @@ module controller #(
 
           p_shifted = p_product >>> 16;
 
-          if (p_shifted > 48'sd2147483647) data_out <= 32'h7FFFFFFF;
-          else if (p_shifted < -48'sd2147483648) data_out <= 32'h80000000;
-          else data_out <= p_shifted[31:0];
+          if (p_shifted > 48'sd2147483647) control_out <= 32'h7FFFFFFF;
+          else if (p_shifted < -48'sd2147483648) control_out <= 32'h80000000;
+          else control_out <= p_shifted[31:0];
 
         encode_en <= 1'b1;
       end
