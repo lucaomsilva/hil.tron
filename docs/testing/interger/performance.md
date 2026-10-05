@@ -6,7 +6,7 @@ This document records the latency and calculation time taken to send randomized 
 
 - **Baudrate**: 115200 bps
 - **Controller Kp**: 10
-- **Reference Value**: 500
+- **Setpoint Value**: 500
 - **Data Range**: Random integers in [0, 499]
 
 ## Results
@@ -55,14 +55,14 @@ def main():
 
     print(f"Opened {port} at {baudrate} baud.")
 
-    # 1. Send Reference Data (Opcode 0x01)
-    reference_value = 500
-    ref_bytes = struct.pack('<I', reference_value)
-    ref_packet = b'\x01' + ref_bytes
-    print(f"Sending reference: {reference_value} (packet: {ref_packet.hex()})")
-    ser.write(ref_packet)
+    # 1. Send Setpoint Data (Opcode 0x01)
+    setpoint_value = 500
+    setpoint_bytes = struct.pack('<I', setpoint_value)
+    setpoint_packet = b'\x01' + setpoint_bytes
+    print(f"Sending setpoint: {setpoint_value} (packet: {setpoint_packet.hex()})")
+    ser.write(setpoint_packet)
 
-    # Give a tiny delay for the FPGA to process the reference if needed
+    # Give a tiny delay for the FPGA to process the setpoint if needed
     time.sleep(0.01)
 
     intervals = []
@@ -71,8 +71,8 @@ def main():
     print(f"\nStarting {num_tests} tests with random data...")
 
     for i in range(num_tests):
-        # Generate random data less than reference value
-        data_value = random.randint(0, reference_value - 1)
+        # Generate random data less than setpoint value
+        data_value = random.randint(0, setpoint_value - 1)
         data_bytes = struct.pack('<I', data_value)
         data_packet = b'\x00' + data_bytes
 
@@ -93,7 +93,7 @@ def main():
             intervals.append(interval)
 
             # Verify the result
-            error = reference_value - data_value
+            error = setpoint_value - data_value
             expected_result = (kp * error) & 0xFFFFFFFF
 
             if result_value == expected_result:

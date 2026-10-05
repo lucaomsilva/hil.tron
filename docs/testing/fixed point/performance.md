@@ -10,7 +10,7 @@ This document records the latency, calculation time, and accuracy validation tak
 
 - **Baudrate**: 115200 bps
 - **Controller Kp**: 5.5 (Format: Q16.16 signed `32'h00058000`)
-- **Reference Value**: 500.0000
+- **Setpoint Value**: 500.0000
 - **Data Range**: Random floats in [0.0000, 1000.0000] (testing both positive and negative errors)
 - **Precision Limit**: 4 decimal places
 
@@ -60,24 +60,24 @@ def main():
 
     print(f"Opened {port} at {baudrate} baud.")
 
-    # 1. Send Reference Data (Opcode 0x01)
-    # The reference is sent as a Q16.16 signed integer
-    reference_float = 500.0000
-    reference_q16 = int(reference_float * 65536)
+    # 1. Send Setpoint Data (Opcode 0x01)
+    # The setpoint is sent as a Q16.16 signed integer
+    setpoint_float = 500.0000
+    setpoint_q16 = int(setpoint_float * 65536)
     
-    ref_bytes = struct.pack('<i', reference_q16)
-    ref_packet = b'\x01' + ref_bytes
-    print(f"Sending reference: {reference_float:.4f} (packet: {ref_packet.hex()})")
-    ser.write(ref_packet)
+    setpoint_bytes = struct.pack('<i', setpoint_q16)
+    setpoint_packet = b'\x01' + setpoint_bytes
+    print(f"Sending setpoint: {setpoint_float:.4f} (packet: {setpoint_packet.hex()})")
+    ser.write(setpoint_packet)
 
     # The FPGA's input_control unconditionally asserts control_en upon finishing ANY packet.
-    # Therefore, the reference packet ALSO generates a 4-byte response from the FPGA.
+    # Therefore, the setpoint packet ALSO generates a 4-byte response from the FPGA.
     # We MUST read and discard this dummy response, otherwise it causes an off-by-one delay!
     dummy_resp = ser.read(4)
     if dummy_resp:
-        print(f"Consumed dummy response from reference packet: {dummy_resp.hex()}")
+        print(f"Consumed dummy response from setpoint packet: {dummy_resp.hex()}")
     
-    # Give a tiny delay for the FPGA to process the reference if needed
+    # Give a tiny delay for the FPGA to process the setpoint if needed
     time.sleep(0.01)
 
     intervals = []
@@ -89,9 +89,9 @@ def main():
     kp_q16 = int(kp_float * 65536)
 
     for i in range(num_tests):
-        # Generate random data with 4 decimal places, which can be greater than the reference
+        # Generate random data with 4 decimal places, which can be greater than the setpoint
         # We test both positive and negative error cases
-        data_float = round(random.uniform(0.0, reference_float * 2.0), 4)
+        data_float = round(random.uniform(0.0, setpoint_float * 2.0), 4)
         data_q16 = int(data_float * 65536)
         
         data_bytes = struct.pack('<i', data_q16)
@@ -117,8 +117,8 @@ def main():
             intervals.append(interval)
 
             # FPGA math simulation for verification:
-            # error = reference - data
-            error_q16 = reference_q16 - data_q16
+            # error = setpoint - data
+            error_q16 = setpoint_q16 - data_q16
             
             # P_prod_full = Kp * error (65-bit in FPGA, we simulate it)
             p_prod_full = kp_q16 * error_q16
@@ -277,7 +277,7 @@ def main():
     setpoint_q16 = int(setpoint_float * 65536)
     
     setpoint_bytes = struct.pack('<i', setpoint_q16)
-    setpoint_packet = b'\x01' + setpoint_bytes
+    setpoint_packet = b'' + setpoint_bytes
     print(f"Sending setpoint: {setpoint_float:.4f} (packet: {setpoint_packet.hex()})")
     ser.write(setpoint_packet)
 
@@ -288,7 +288,7 @@ def main():
     # Kp in Q16.16
     kp_q16 = int(kp_float * 65536)
     kp_bytes = struct.pack('<i', kp_q16)
-    kp_packet = b'\x02' + kp_bytes
+    kp_packet = b'' + kp_bytes
     print(f"Sending Kp: {kp_float:.4f} (packet: {kp_packet.hex()})")
     ser.write(kp_packet)
     
@@ -307,7 +307,7 @@ def main():
         data_q16 = int(data_float * 65536)
         
         data_bytes = struct.pack('<i', data_q16)
-        data_packet = b'\x00' + data_bytes
+        data_packet = b' ' + data_bytes
 
         # Measure time
         start_time = time.perf_counter()
