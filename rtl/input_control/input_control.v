@@ -14,17 +14,23 @@ module input_control (
     input  wire decode_ready,
     output reg  decode_read,
 
-    // Reference Interface
-    output reg ref_en,
+    // Setpoint Interface
+    output reg setpoint_en,
 
     // Control Interface
     output reg control_en,
-    output reg kp_en
+    output reg kp_en,
+    output reg ki_en
 );
 
   localparam IDLE = 2'd0;
   localparam DATA = 2'd1;
   localparam WAIT = 2'd2;
+
+  localparam integer OP_DATA     = 8'h00;
+  localparam integer OP_SETPOINT = 8'h01;
+  localparam integer OP_KP       = 8'h02;
+  localparam integer OP_KI       = 8'h03;
 
   reg [1:0] state;
   reg [2:0] byte_count;
@@ -41,45 +47,59 @@ module input_control (
     if (!rst) begin
       state <= IDLE;
       decode_read <= 1'b0;
-      ref_en <= 1'b0;
+      setpoint_en <= 1'b0;
       control_en <= 1'b0;
       kp_en <= 1'b0;
+      ki_en <= 1'b0;
       is_data_opcode <= 1'b0;
     end else begin
       decode_read <= 1'b0;
-      ref_en <= 1'b0;
+      setpoint_en <= 1'b0;
       control_en <= 1'b0;
       kp_en <= 1'b0;
+      ki_en <= 1'b0;
 
       case (state)
         IDLE: begin
           if (opcode_transfer) begin
             case (opcode)
-              8'h00: begin
+              OP_DATA: begin
                 state <= DATA;
                 byte_count <= 3'd0;
                 is_data_opcode <= 1'b1;
-                ref_en <= 1'b0;
+                setpoint_en <= 1'b0;
                 kp_en <= 1'b0;
+                ki_en <= 1'b0;
               end
-              8'h01: begin
+              OP_SETPOINT: begin
                 state <= DATA;
                 byte_count <= 3'd0;
                 is_data_opcode <= 1'b0;
-                ref_en <= 1'b1;
+                setpoint_en <= 1'b1;
                 kp_en <= 1'b0;
+                ki_en <= 1'b0;
               end
-              8'h02: begin
+              OP_KP: begin
                 state <= DATA;
                 byte_count <= 3'd0;
                 is_data_opcode <= 1'b0;
-                ref_en <= 1'b0;
+                setpoint_en <= 1'b0;
                 kp_en <= 1'b1;
+                ki_en <= 1'b0;
+              end
+              OP_KI: begin
+                state <= DATA;
+                byte_count <= 3'd0;
+                is_data_opcode <= 1'b0;
+                setpoint_en <= 1'b0;
+                kp_en <= 1'b0;
+                ki_en <= 1'b1;
               end
               default: begin
                 is_data_opcode <= 1'b0;
-                ref_en <= 1'b0;
+                setpoint_en <= 1'b0;
                 kp_en <= 1'b0;
+                ki_en <= 1'b0;
               end
             endcase
           end
