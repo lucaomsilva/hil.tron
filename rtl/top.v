@@ -41,6 +41,7 @@ module top (
   wire control_en;
   wire kp_en;
   wire ki_en;
+  wire kd_en;
 
   input_control input_control_inst (
       .clk(CLK),
@@ -55,7 +56,8 @@ module top (
       .setpoint_en(setpoint_en),
       .control_en(control_en),
       .kp_en(kp_en),
-      .ki_en(ki_en)
+      .ki_en(ki_en),
+      .kd_en(kd_en)
   );
 
   // --- Decode & Encode Loopback ---
@@ -140,6 +142,20 @@ module top (
       .data_out(ki_out)
   );
 
+  // --- Kd Register ---
+  wire [31:0] kd_out;
+
+  register #(
+      .INIT_VAL(32'h00000000)
+  ) kd_register_inst (
+      .clk(CLK),
+      .rst(1'b1),
+      .reg_en(kd_en),
+      .write_en(decode_ready),
+      .data_in(decode_data),
+      .data_out(kd_out)
+  );
+
   // --- Controller ---
   wire encode_en;
 
@@ -150,6 +166,7 @@ module top (
       .setpoint(setpoint_out),
       .kp(kp_out),
       .ki(ki_out),
+      .kd(kd_out),
       .feedback(decode_data),
       .control_out(encode_data_in),
       .encode_en(encode_en)
