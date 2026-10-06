@@ -1,6 +1,6 @@
-# Proportional-Integral-Derivative (PID) Control Comparison
+# Derivative (D) Control Comparison
 
-This document compares the Hardware-in-the-Loop (HIL) plant simulation results with and without the FPGA-based PID controller. The simulation is driven by the [HIL Simulation Script](#hil-simulation-script).
+This document compares the Hardware-in-the-Loop (HIL) plant simulation results with and without the FPGA-based pure derivative controller. The simulation is driven by the [HIL Simulation Script](#hil-simulation-script).
 
 ## Plant Transfer Function
 
@@ -25,35 +25,33 @@ In the open-loop test, a step input (setpoint) is applied directly to the plant.
 
 ---
 
-## Closed-Loop System (With PID Control)
+## Closed-Loop System (With Pure Derivative Control)
 
-For the closed-loop HIL simulation, the FPGA computes the control effort $u(t)$ based on the error between the setpoint and the plant output. To avoid the "derivative kick" when the setpoint changes, the Derivative action is calculated based on the measurement (feedback) instead of the error.
+For the closed-loop HIL simulation, the FPGA computes the control effort $u(t)$ based on the error between the setpoint and the plant output. However, to avoid "derivative kick," the derivative action in this controller is calculated based solely on the measurement (feedback) instead of the error.
 
 ### Controller Parameters
 - **Setpoint**: $500.0$
-- **Controller Proportional Gain ($K_p$)**: $15.75$
-- **Controller Integral Gain ($K_i$)**: $3.4$
+- **Controller Proportional Gain ($K_p$)**: $0.0$
+- **Controller Integral Gain ($K_i$)**: $0.0$
 - **Controller Derivative Gain ($K_d$)**: $1.2$
 
-The PI action operates on the error $E(s)$, while the Derivative action operates on the plant output $Y(s)$:
-$$U(s) = \left(K_p + \frac{K_i}{s}\right) E(s) - (K_d s) Y(s)$$
+With only the derivative controller acting on the process variable $Y(s)$, the control effort is $U(s) = -K_d s Y(s)$. 
+Substituting this into the plant equation $Y(s) = G(s)U(s)$ for the closed-loop response to a setpoint yields:
+$Y(s) = \frac{1}{s+1} (-K_d s Y(s))$, which simplifies to $Y(s) \left( 1 + \frac{K_d s}{s+1} \right) = 0$.
 
-By substituting $E(s) = R(s) - Y(s)$, the effective closed-loop transfer function $T(s) = \frac{Y(s)}{R(s)}$ is derived as:
-$$T(s) = \frac{15.75 s + 3.4}{1.2 s^2 + 16.75 s + 3.4}$$
+Because there is no proportional or integral term acting on the error, the controller fundamentally ignores the setpoint.
 
 ### Closed-Loop Characteristics
-- **New Poles**: $s_1 \approx -7.40$, $s_2 \approx -0.21$ (Both stable, left-half plane)
-- **New Zero**: $s \approx -0.22$
-- **System Dynamics**: The system is second-order. The zero at $-0.22$ closely cancels the slow pole at $-0.21$, leaving the fast pole ($s_1 \approx -7.40$) to dictate the dominant transient response. While slightly slower than the pure PI system, the Derivative action increases the system's damping, significantly reducing any potential overshoot.
-- **Closed-Loop DC Gain**: $\frac{3.4}{3.4} = 1.0$ (Zero steady-state error)
+- **Expected Steady-State Output**: $0$
+- **System Dynamics**: The pure derivative controller strictly opposes changes in the process variable. Since the setpoint does not induce any control effort, the plant output will remain at 0 (or rapidly return to 0 if disturbed).
 
 ![With Control](img/hil_with_control_ss.png)
 
 ### Analysis of the Results
 
-1. **Damping and Speed**: The derivative term acts as a "brake" to the proportional control, predicting future errors and slowing the system down as it approaches the setpoint to prevent overshoot. 
-2. **Derivative Kick Prevention**: Because the derivative term is based purely on the feedback measurement (Process Variable) rather than the error, the massive instantaneous spike (impulse) in control effort that normally accompanies a step change in setpoint is entirely avoided.
-3. **Steady-State Error**: The integral (I) action integrates the error over time, continuing to force the steady-state error to zero precisely.
+1. **Setpoint Tracking**: Because $K_p = 0$ and $K_i = 0$, the controller generates zero effort in response to the setpoint change. 
+2. **Derivative Action on PV**: The derivative action is designed to brake the system by opposing the rate of change of the process variable. Without a proportional term to drive the system forward, the derivative term simply acts as additional damping, keeping the plant output at exactly 0.
+3. **Control Effort ($u$)**: The control effort remains at 0 throughout the simulation because the process variable never moves, hence its derivative is always zero.
 
 ---
 
@@ -66,9 +64,9 @@ python3 -m venv venv
 sudo venv/bin/python3 -m pip install pyserial numpy matplotlib control
 ```
 
-## HIL Simulation Script (Difference Equations)
+## V2 HIL Simulation Script (Difference Equations)
 
-The simulation script used to generate these results is provided below. This script configures all three PID gains dynamically via UART opcodes, runs the Hardware-in-the-Loop test, and plots the results.
+The simulation script used to generate these results is provided below. This script defines the continuous plant, converts it to discrete difference equations, configures the FPGA over UART using the new opcodes, runs the Hardware-in-the-Loop test, and plots the results.
 
 ```python
 import serial
@@ -93,6 +91,8 @@ def main():
         sys.exit(1)
 
     # 2. Define the Plant using Python Control Library
+    # Let's create a simple first-order system
+    # G(s) = K / (tau * s + 1)
     K_plant = 1.0
     tau = 1.0
     sys_c = ct.tf([K_plant], [tau, 1])
@@ -105,34 +105,70 @@ def main():
     b = sys_d.num[0][0]
     a = sys_d.den[0][0]
     
+    # Pad numerator with leading zeros to match denominator length
+    # This ensures b aligns with the correct delays (e.g. u[k-1])
     if len(b) < len(a):
         b = np.pad(b, (len(a) - len(b), 0), 'constant')
     
+    # Normalize by leading denominator coefficient
     b = b / a[0]
     a = a / a[0]
 
     # 3. Setup HIL Simulation Parameters
     setpoint_float = 500.0
-    ser.write(b'\x01' + struct.pack('<i', int(setpoint_float * 65536)))
+    setpoint_q16 = int(setpoint_float * 65536)
+
+    # Send Setpoint Packet (Opcode 0x01)
+    setpoint_bytes = struct.pack('<i', setpoint_q16)
+    setpoint_packet = b'\x01' + setpoint_bytes
+    print(f"Sending setpoint: {setpoint_float:.4f}")
+    ser.write(setpoint_packet)
+
+    # Give a tiny delay for the FPGA to process the setpoint
     time.sleep(0.01)
 
-    kp_float = 15.75
-    ser.write(b'\x02' + struct.pack('<i', int(kp_float * 65536)))
+    kp_float = 0.0
+    kp_q16 = int(kp_float * 65536)
+
+    # Send Kp Packet (Opcode 0x02)
+    kp_bytes = struct.pack('<i', kp_q16)
+    kp_packet = b'\x02' + kp_bytes
+    print(f"Sending Kp: {kp_float:.4f}")
+    ser.write(kp_packet)
+
+    # Give a tiny delay for the FPGA to process Kp
     time.sleep(0.01)
 
-    ki_float = 3.4
-    ser.write(b'\x03' + struct.pack('<i', int(ki_float * 65536)))
+    ki_float = 0.0
+    ki_q16 = int(ki_float * 65536)
+
+    # Send Ki Packet (Opcode 0x03)
+    ki_bytes = struct.pack('<i', ki_q16)
+    ki_packet = b'\x03' + ki_bytes
+    print(f"Sending Ki: {ki_float:.4f}")
+    ser.write(ki_packet)
+
+    # Give a tiny delay for the FPGA to process Ki
     time.sleep(0.01)
-    
+
     kd_float = 1.2
-    ser.write(b'\x04' + struct.pack('<i', int(kd_float * 65536)))
+    kd_q16 = int(kd_float * 65536)
+
+    # Send Kd Packet (Opcode 0x04)
+    kd_bytes = struct.pack('<i', kd_q16)
+    kd_packet = b'\x04' + kd_bytes
+    print(f"Sending Kd: {kd_float:.4f}")
+    ser.write(kd_packet)
+
+    # Give a tiny delay for the FPGA to process Kd
     time.sleep(0.01)
 
     # 4. Run the HIL Simulation Loop
-    num_steps = 200
+    num_steps = 200  # 200 steps * 0.01s = 2.0 seconds of simulation
 
     y_hist = np.zeros(len(a))
     u_hist = np.zeros(len(b))
+
     y_open_hist = np.zeros(len(a))
     u_open_hist = np.zeros(len(b))
 
@@ -146,6 +182,7 @@ def main():
     start_sim_time = time.time()
 
     for k in range(num_steps):
+        # Shift histories for difference equations
         for i in range(len(a)-1, 0, -1):
             y_hist[i] = y_hist[i-1]
             y_open_hist[i] = y_open_hist[i-1]
@@ -153,6 +190,7 @@ def main():
             u_hist[i] = u_hist[i-1]
             u_open_hist[i] = u_open_hist[i-1]
 
+        # Calculate current output of the plant using difference equation
         y_float = 0.0
         y_open_float = 0.0
         for i in range(1, len(a)):
@@ -167,21 +205,29 @@ def main():
         y_hist[0] = y_float
         y_open_hist[0] = y_open_float
 
+        # Quantize to Q16.16 format for the FPGA
         y_q16 = int(y_float * 65536)
-        ser.write(b'\x00' + struct.pack('<i', y_q16))
 
+        # Send current plant output (feedback) to FPGA (Opcode 0x00)
+        data_packet = b'\x00' + struct.pack('<i', y_q16)
+        ser.write(data_packet)
+
+        # Wait for the control signal (u) from FPGA
         response = ser.read(4)
 
         if len(response) == 4:
+            # Result from FPGA is Q16.16 signed integer
             u_q16 = struct.unpack('<i', response)[0]
             u_float = u_q16 / 65536.0
         else:
             print(f"Error: Step {k} failed to receive full response. Using u = 0.")
+            print(f"response={response}")
             u_float = 0.0
 
         u_hist[0] = u_float
         u_open_hist[0] = setpoint_float
 
+        # Record history for plotting
         t = k * dt
         history_t.append(t)
         history_y.append(y_float)
@@ -193,12 +239,13 @@ def main():
     print(f"Simulation finished in {time.time() - start_sim_time:.2f} seconds.")
 
     # 5. Plot the Results
+    # Graphic 1: With Control
     plt.figure(figsize=(10, 8))
 
     plt.subplot(2, 1, 1)
     plt.plot(history_t, history_y, label='Plant Output (Closed-Loop)', color='blue', linewidth=2)
     plt.plot(history_t, history_setpoint, label='Setpoint', color='red', linestyle='--')
-    plt.title('Hardware-in-the-Loop - With PID Control (Closed-Loop)')
+    plt.title('Hardware-in-the-Loop - With Pure Derivative Control (Closed-Loop)')
     plt.ylabel('Amplitude')
     plt.grid(True)
     plt.legend()
@@ -214,6 +261,7 @@ def main():
     plt.tight_layout()
     plt.savefig('hil_with_control.png')
 
+    # Graphic 2: Without Control
     plt.figure(figsize=(10, 4))
     plt.plot(history_t, history_y_open, label='Plant Output (Open-Loop)', color='orange', linewidth=2)
     plt.plot(history_t, history_setpoint, label='Setpoint (Input Step)', color='red', linestyle='--')
@@ -230,4 +278,174 @@ def main():
 
 if __name__ == '__main__':
     main()
+```
+
+## V2 State-Space Simulation Script
+
+The simulation script used to generate these results is provided below. This script performs the Hardware-in-the-Loop test utilizing matrix math (State-Space).
+
+```python
+import serial
+import time
+import struct
+import sys
+import numpy as np
+import matplotlib.pyplot as plt
+import control as ct
+
+def main():
+    # 1. Setup Serial Port
+    port = '/dev/ttyUSB1'
+    baudrate = 115200
+ 
+    try:
+        ser = serial.Serial(port, baudrate, timeout=2.0)
+        print(f"Opened {port} at {baudrate} baud.")
+    except Exception as e:
+        print(f"Error opening serial port: {e}")
+        sys.exit(1)
+
+    # 2. Define the Plant using Python Control Library
+    K_plant = 1.0
+    tau = 1.0
+    sys_c = ct.tf([K_plant], [tau, 1])
+    print(f"\nContinuous Plant Transfer Function:\n{sys_c}")
+
+    # Convert to Discrete State-Space
+    dt = 0.01 # 10 ms sample time
+    sys_d = ct.sample_system(sys_c, dt, method='zoh')
+    ss_d = ct.tf2ss(sys_d)
+
+    A, B, C, D = ss_d.A, ss_d.B, ss_d.C, ss_d.D
+
+    # 3. Setup HIL Simulation Parameters
+    setpoint_float = 500.0
+    setpoint_q16 = int(setpoint_float * 65536)
+
+    # Send Setpoint Packet (Opcode 0x01)
+    ser.write(b'\x01' + struct.pack('<i', setpoint_q16))
+    print(f"Sending setpoint: {setpoint_float:.4f}")
+    time.sleep(0.01)
+
+    kp_float = 0.0
+    kp_q16 = int(kp_float * 65536)
+
+    # Send Kp Packet (Opcode 0x02)
+    ser.write(b'\x02' + struct.pack('<i', kp_q16))
+    print(f"Sending Kp: {kp_float:.4f}")
+    time.sleep(0.01)
+
+    ki_float = 0.0
+    ki_q16 = int(ki_float * 65536)
+
+    # Send Ki Packet (Opcode 0x03)
+    ser.write(b'\x03' + struct.pack('<i', ki_q16))
+    print(f"Sending Ki: {ki_float:.4f}")
+    time.sleep(0.01)
+
+    kd_float = 1.2
+    kd_q16 = int(kd_float * 65536)
+
+    # Send Kd Packet (Opcode 0x04)
+    ser.write(b'\x04' + struct.pack('<i', kd_q16))
+    print(f"Sending Kd: {kd_float:.4f}")
+    time.sleep(0.01)
+
+    # 4. Run the HIL Simulation Loop
+    num_steps = 200  # 2.0 seconds of simulation
+
+    x = np.zeros((A.shape[0], 1))
+    x_open = np.zeros((A.shape[0], 1))
+
+    history_t = []
+    history_y = []
+    history_y_open = []
+    history_u = []
+    history_setpoint = []
+
+    print("\nStarting State-Space HIL Simulation...")
+    start_sim_time = time.time()
+
+    for k in range(num_steps):
+        # Calculate current output using state-space matrices
+        y_float = float((C @ x).item())
+        y_open_float = float((C @ x_open).item())
+
+        # Quantize to Q16.16 format for the FPGA
+        y_q16 = int(y_float * 65536)
+
+        # Send current plant output (feedback) to FPGA (Opcode 0x00)
+        ser.write(b'\x00' + struct.pack('<i', y_q16))
+
+        # Wait for the control signal (u) from FPGA
+        response = ser.read(4)
+
+        if len(response) == 4:
+            u_q16 = struct.unpack('<i', response)[0]
+            u_float = u_q16 / 65536.0
+        else:
+            print(f"Error: Step {k} failed to receive full response. Using u = 0.")
+            u_float = 0.0
+
+        # Update the plant states
+        x = A @ x + B * u_float
+        x_open = A @ x_open + B * setpoint_float
+
+        # Record history for plotting
+        t = k * dt
+        history_t.append(t)
+        history_y.append(y_float)
+        history_u.append(u_float)
+        history_setpoint.append(setpoint_float)
+        history_y_open.append(y_open_float)
+
+    ser.close()
+    print(f"Simulation finished in {time.time() - start_sim_time:.2f} seconds.")
+
+    # 5. Plot the Results
+    plt.figure(figsize=(10, 8))
+
+    plt.subplot(2, 1, 1)
+    plt.plot(history_t, history_y, label='Plant Output (Closed-Loop)', color='blue', linewidth=2)
+    plt.plot(history_t, history_setpoint, label='Setpoint', color='red', linestyle='--')
+    plt.title('State-Space HIL - With Pure Derivative Control (Closed-Loop)')
+    plt.ylabel('Amplitude')
+    plt.grid(True)
+    plt.legend()
+
+    plt.subplot(2, 1, 2)
+    plt.plot(history_t, history_u, label='Control Signal (FPGA)', color='green')
+    plt.title('Controller Effort')
+    plt.xlabel('Time (seconds)')
+    plt.ylabel('Control Signal (u)')
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig('hil_with_control_ss.png')
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(history_t, history_y_open, label='Plant Output (Open-Loop)', color='orange', linewidth=2)
+    plt.plot(history_t, history_setpoint, label='Setpoint (Input Step)', color='red', linestyle='--')
+    plt.title('State-Space Simulation - Without Control (Open-Loop)')
+    plt.xlabel('Time (seconds)')
+    plt.ylabel('Amplitude')
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig('hil_without_control_ss.png')
+
+    print("\nPlots saved as 'hil_with_control_ss.png' and 'hil_without_control_ss.png'")
+
+if __name__ == '__main__':
+    main()
+```
+
+### Run Script
+
+Inside the script folder, after the dependencies have been installed, execute one of the following commands to run the simulation:
+
+```bash
+sudo venv/bin/python3 main.py
 ```
